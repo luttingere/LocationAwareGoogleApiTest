@@ -8,6 +8,7 @@ import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Log;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -71,6 +72,7 @@ public class GoogleLocationServices extends Service implements GoogleApiClient.C
         initializeGoogleApiClient();
         connectWithLocationServiceApi();
         enableCommunicationWithTheMainThread();
+        Log.i(GlobalValues.TRACE_ID,"Location Service Initialized.");
         return START_STICKY;
     }
 
@@ -82,6 +84,7 @@ public class GoogleLocationServices extends Service implements GoogleApiClient.C
         super.onDestroy();
         stopLocationUpdates();
         disconnectFromLocationServiceApi();
+        Log.i(GlobalValues.TRACE_ID,"Location Service Destroyed.");
     }
 
     /**
@@ -218,8 +221,8 @@ public class GoogleLocationServices extends Service implements GoogleApiClient.C
      */
     private LocationObject getLocationObject(Location location){
         LocationObject locationObject = new LocationObject(
-                location.getLatitude(),
                 location.getLongitude(),
+                location.getLatitude(),
                 location.getSpeed(),
                 location.getAltitude(),
                 location.getBearing(),

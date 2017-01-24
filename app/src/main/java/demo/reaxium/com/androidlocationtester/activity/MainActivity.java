@@ -4,10 +4,22 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.TextView;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.text.SimpleDateFormat;
 
@@ -15,6 +27,8 @@ import demo.reaxium.com.androidlocationtester.R;
 import demo.reaxium.com.androidlocationtester.beans.LocationObject;
 import demo.reaxium.com.androidlocationtester.globals.GlobalValues;
 import demo.reaxium.com.androidlocationtester.service.GoogleLocationServices;
+import demo.reaxium.com.androidlocationtester.util.MarkerAnimation;
+import demo.reaxium.com.androidlocationtester.util.LatLngInterpolator;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,11 +44,34 @@ public class MainActivity extends AppCompatActivity {
     private LocationObject locationObject;
 
     /**
-     *  Elementos en pantalla
-      */
+     * Elementos en pantalla
+     */
     private TextView latitude, longitude, accuracy, speed, direction, provider, time;
 
     private SimpleDateFormat format = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss a");
+
+
+    /**
+     * Mapa fragmento de android
+     */
+    private SupportMapFragment mapFragment;
+
+    /**
+     * Instancia del objeto mapa de google maps
+     */
+    private GoogleMap googleMap;
+
+    private Marker markerUbicacion;
+
+    private static final float DEFAULT_ZOOM = 17.0F;
+
+    /**
+     * referencia de clase al zoom actual de la camara del mapa
+     */
+    private float googleMapZoom = DEFAULT_ZOOM;
+
+
+
 
     /**
      * Broad cast handler
@@ -46,15 +83,35 @@ public class MainActivity extends AppCompatActivity {
                 case GlobalValues.LOCATION_CHANGED:
                     //Aqui corren las actividades cuando se recibe una nueva ubicacion
                     locationObject = (LocationObject) intent.getSerializableExtra(GlobalValues.BROADCAST_PARAM);
-                    if(locationObject != null){
+                    if (locationObject != null) {
 
-                        latitude.setText(""+locationObject.getLatitude());
-                        longitude.setText(""+locationObject.getLongitude());
-                        accuracy.setText(""+locationObject.getAccuracy());
-                        speed.setText(""+locationObject.getSpeed());
-                        direction.setText(""+locationObject.getBearing());
+                        latitude.setText("" + locationObject.getLatitude());
+                        longitude.setText("" + locationObject.getLongitude());
+                        accuracy.setText("" + locationObject.getAccuracy());
+                        speed.setText("" + locationObject.getSpeed());
+                        direction.setText("" + locationObject.getBearing());
                         provider.setText(locationObject.getProveedor());
                         time.setText(format.format(locationObject.getTime()));
+
+                        if (googleMap != null) {
+                            LatLng latLng = new LatLng(locationObject.getLatitude(), locationObject.getLongitude());
+                            if (markerUbicacion != null) {
+                                MarkerAnimation.animateMarkerToGB(markerUbicacion, latLng, new LatLngInterpolator.LinearFixed(), 2000);
+                            } else {
+                                createMarker(latLng);
+                            }
+
+                            googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(getCameraPosition(latLng)), 2000, new GoogleMap.CancelableCallback() {
+                                @Override
+                                public void onFinish() {
+                                }
+
+                                @Override
+                                public void onCancel() {
+                                }
+                            });
+
+                        }
 
                     }
                     break;
@@ -76,16 +133,30 @@ public class MainActivity extends AppCompatActivity {
         direction = (TextView) findViewById(R.id.direction);
         provider = (TextView) findViewById(R.id.provider);
         time = (TextView) findViewById(R.id.time);
-        registerTheBroadCast();
-        startNotificationService();
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        mapFragment = ((SupportMapFragment) fragmentManager.findFragmentById(R.id.map));
+        mapFragment.getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(GoogleMap map) {
+                googleMap = map;
+                googleMap.setOnCameraChangeListener(getCameraChangeListener());
+            }
+        });
     }
 
 
     @Override
-    protected void onStop() {
-        super.onStop();
-        stopNotificationService();
+    protected void onPause() {
+        super.onPause();
         unregisterBroadCast();
+        stopNotificationService();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        registerTheBroadCast();
+        startNotificationService();
     }
 
     /**
@@ -119,5 +190,47 @@ public class MainActivity extends AppCompatActivity {
      */
     private void unregisterBroadCast() {
         mLocalBroadcastManager.unregisterReceiver(mBroadcastReceiver);
+    }
+
+
+    /**
+     * Carga la instancia del marker de la ubicacion del dispositivo
+     */
+    private void createMarker(LatLng location) {
+        MarkerOptions marker = new MarkerOptions();
+        marker.position(location);
+        marker.icon(BitmapDescriptorFactory.fromResource(R.mipmap.ic_launcher));
+        markerUbicacion = googleMap.addMarker(marker);
+    }
+
+    /**
+     * Crea una instancia de posicion de la camara
+     *
+     * @param busLocation
+     * @return
+     */
+    private CameraPosition getCameraPosition(LatLng busLocation) {
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(busLocation)      // Sets the center of the map to the actual position of the device
+                .zoom(googleMapZoom)     // Sets the zoom
+                .bearing(90)                // Sets the orientation of the camera to north
+                .tilt(60)                   // Sets the tilt of the camera to 30 degrees
+                .build();                   // Creates a CameraPosition from the builder
+
+        return cameraPosition;
+
+    }
+    /**
+     * Vigila los cambios de orientacion y zoom en la camara del mapa
+     *
+     * @return
+     */
+    private GoogleMap.OnCameraChangeListener getCameraChangeListener() {
+        return new GoogleMap.OnCameraChangeListener() {
+            @Override
+            public void onCameraChange(CameraPosition position) {
+                googleMapZoom = position.zoom;
+            }
+        };
     }
 }
