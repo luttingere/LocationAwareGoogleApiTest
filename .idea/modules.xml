@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/AndroidLocationTester.iml" filepath="$PROJECT_DIR$/AndroidLocationTester.iml" />
+      <module fileurl="file://$PROJECT_DIR$/LocationAwareGoogleApiTest.iml" filepath="$PROJECT_DIR$/LocationAwareGoogleApiTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>

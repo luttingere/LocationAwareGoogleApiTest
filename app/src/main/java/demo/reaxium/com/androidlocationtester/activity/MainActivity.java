@@ -4,10 +4,15 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.FloatMath;
 import android.widget.TextView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -30,7 +35,7 @@ import demo.reaxium.com.androidlocationtester.service.GoogleLocationServices;
 import demo.reaxium.com.androidlocationtester.util.MarkerAnimation;
 import demo.reaxium.com.androidlocationtester.util.LatLngInterpolator;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
 
     /**
@@ -46,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Elementos en pantalla
      */
-    private TextView latitude, longitude, accuracy, speed, direction, provider, time;
+    private TextView latitude, longitude, accuracy, speed, direction, provider, time, motion;
 
     private SimpleDateFormat format = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss a");
 
@@ -71,7 +76,16 @@ public class MainActivity extends AppCompatActivity {
     private float googleMapZoom = DEFAULT_ZOOM;
 
 
+    /**
+     * Instancias para sensores de movimiento
+     */
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
 
+    private float[] mGravity;
+    private double mAccel;
+    private double mAccelCurrent;
+    private double mAccelLast;
 
     /**
      * Broad cast handler
@@ -132,7 +146,15 @@ public class MainActivity extends AppCompatActivity {
         speed = (TextView) findViewById(R.id.speed);
         direction = (TextView) findViewById(R.id.direction);
         provider = (TextView) findViewById(R.id.provider);
+        motion = (TextView) findViewById(R.id.movement);
         time = (TextView) findViewById(R.id.time);
+        // configuracion sensor
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mAccel = 0.00f;
+        mAccelCurrent = SensorManager.GRAVITY_EARTH;
+        mAccelLast = SensorManager.GRAVITY_EARTH;
+
         FragmentManager fragmentManager = getSupportFragmentManager();
         mapFragment = ((SupportMapFragment) fragmentManager.findFragmentById(R.id.map));
         mapFragment.getMapAsync(new OnMapReadyCallback() {
@@ -150,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         unregisterBroadCast();
         stopNotificationService();
+        sensorManager.unregisterListener(this);
     }
 
     @Override
@@ -157,7 +180,34 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         registerTheBroadCast();
         startNotificationService();
+        sensorManager.registerListener(this,accelerometer,SensorManager.SENSOR_DELAY_UI);
     }
+
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+
+        if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER){
+            mGravity = event.values.clone();
+            // Shake detection
+            double x = mGravity[0];
+            double y = mGravity[1];
+            double z = mGravity[2];
+            mAccelLast = mAccelCurrent;
+            mAccelCurrent = Math.sqrt(x*x+y*y+z*z);
+            double delta =  mAccelCurrent - mAccelLast;
+            mAccel = mAccel * 0.9f + delta;
+
+            if(mAccel > 1){
+                motion.setText(String.valueOf(mAccel));
+            }else{
+                motion.setText("0.0");
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     /**
      * Inicia el servicio de Ubicacion
